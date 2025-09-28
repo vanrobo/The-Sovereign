@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 from google import genai
 import json
+import subprocess
 
 #from this project
 import content
@@ -68,6 +69,36 @@ class Ai:
         )
         return response.text
 
+    """
+    Tools: 
+    Execute Shell [to execute a command in the terminal]
+    Write to File [to write to a file path]
+    """
+
+    def perform_write_file(self,file_path,content):
+        """Writes content to a specified file."""
+        try:
+            with open(file_path, 'w') as f:
+                f.write(content)
+            print(f"  [SUCCESS] Wrote content to '{file_path}'")
+            return True # Indicate success
+        except Exception as e:
+            print(f"  [FAILURE] Could not write to file '{file_path}': {e}")
+            return False # Indicate failure      
+        
+    def perform_execute_shell(self,command):
+        """Executes a shell command."""
+        try:
+            # Using subprocess.run is safer and more modern
+            result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
+            print(f"  [SUCCESS] Executed command: '{command}'")
+            # You could print result.stdout if you wanted to see the command's output
+            return True # Indicate success
+        except subprocess.CalledProcessError as e:
+            print(f"  [FAILURE] Command '{command}' failed with exit code {e.returncode}")
+            print(f"  [STDERR]: {e.stderr}")
+            return False # Indicate failure
+        
 """
 This is just temporary, command line only, user input based output testing for a basic baron AI agent.
 It outputs the following:-
@@ -90,37 +121,54 @@ if __name__ == "__main__":
                 out=orchestrator.generate(x) # generates the output and returns a json
                 AIjson=json.loads(out) # loading the json
 
-                # all of this is just printing the output            
-                print(f"AI's Thought Process: {AIjson['thought']}")
+
                 for step in AIjson['steps']:
-                    print("\n")
-                    print(f"  Step {step['step_number']}: {step['reasoning']}")
-                    print(f"  └── Command: `{step['command']}`")
-                print()
-                print("specific commands")
+                    # --- Safely get all the data from the current step ---
+                    step_num = step.get('step_number', 'N/A')
+                    command_call = step.get('command_call', {})
+                    function_call = command_call.get('function', 'N/A')
+                    arguments = command_call.get('args', {})
 
-                print("\nThe Individuals\n")
+                    # --- Print the primary step information ---
+                    print(f"Step {step_num}:")
 
-                for steps in AIjson['steps']:
-                    command_call = step['command_call']
-                    function_call = command_call['function']
-                    arguments = command_call['args']
-                    if 'condition' not in step:
-                        continue
-                    else:
+                    # Determine what the command is for display purposes
+                    display_command = "N/A"
+                    if function_call == 'execute_shell':
+                        display_command = arguments.get('command', 'No command specified.')
+                    elif function_call == 'write_file':
+                        display_command = f"Write to file '{arguments.get('file_path', 'N/A')}'"
+
+                    print(f"  └── Command: `{display_command}`")
+
+                    # --- Check for and print the conditional logic ---
+                    if 'condition' in step:
                         condition = step['condition']
-                        check_step = condition['check_step']
-                        required_outcome = condition['on_outcome']
+                        check_step = condition.get('check_step', '?')
+                        required_outcome = condition.get('on_outcome', '?')
 
-                    print(f"Step {step['step_number']}: ")
-                    print(f"  └── Command: `{step['command']}`")
-                    print(f"      └── Condition: {condition}, check_step: {check_step} ")
-                    print(f"          └──Required Outcome: {required_outcome}")
-                    print(f"             └──Command: {command_call}, Function: {function_call}, Arguments: {arguments}")
-                    
+                        print(f"      └── Condition: Depends on step {check_step} outcome being '{required_outcome}'")
+                        print(f"          └── Full Command Call Details:")
+                        print(f"              └── Function: {function_call}")
+                        print(f"              └── Arguments: {arguments}")
+                    else:
+                        print("      └── Condition: None (This step always runs)")
+
+                print("--------------------------\n")
+
                 print()
+                has_shell_commands = False
                 for step in AIjson['steps']:
-                    print(step['command'])
+                    # Check if the function is 'execute_shell' before trying to print a command
+                    if step.get('command_call', {}).get('function') == 'execute_shell':
+                        command = step['command_call'].get('args', {}).get('command')
+                        if command:
+                            print(command)
+                            has_shell_commands = True
+
+                if not has_shell_commands:
+                    print("(No raw shell commands in this plan)")
+                print("-------------------------------------\n")
 
         except json.JSONDecodeError:
             print("\n--- ERROR: The AI did not return valid JSON. ---")
