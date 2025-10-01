@@ -1,23 +1,23 @@
 import subprocess
 
-# Execute a simple command and capture output
-# 'dir' is a built-in Windows shell command, so we need shell=True to execute it.
+# Run the 'ls -l' command on Linux/macOS or 'dir' on Windows.
+# The command and its arguments are passed as a list of strings.
+# For a cross-platform example, you could use: ['python', '--version']
 try:
-    result = subprocess.run('dir', shell=True, capture_output=True, text=True, check=True)
-    print("--- Directory Listing ---")
-    print(result.stdout)
-    if result.stderr:
-        print("--- Errors ---") 
-        print(result.stderr)
+    # For Unix-like systems (Linux, macOS)
+    result = subprocess.run(['ls', '-l'], capture_output=True, text=True, check=True)
 except FileNotFoundError:
-    print("Error: The 'dir' command is not available.")
-except subprocess.CalledProcessError as e:
-    print(f"Command failed with return code {e.returncode}")
-    print(e.stderr)
+    # For Windows
+    result = subprocess.run(['dir'], capture_output=True, text=True, check=True, shell=True)
 
 
-# Execute a command with shell=True
-# This command works similarly on both platforms when shell=True is used.
-result_shell = subprocess.run('echo "Hello from the Windows shell!"', shell=True, capture_output=True, text=True)
-print("\n--- Echo Command ---")
-print(result_shell.stdout)
+# The standard output of the command is captured in the 'stdout' attribute.
+print("Standard Output:")
+print(result.stdout)
+
+# The standard error (if any) is in the 'stderr' attribute.
+print("\nStandard Error:")
+print(result.stderr)
+
+# The return code of the command is in the 'returncode' attribute.
+print(f"\nReturn Code: {result.returncode}")

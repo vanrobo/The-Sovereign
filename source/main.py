@@ -71,8 +71,8 @@ class Ai:
 
     """
     Tools: 
-    Execute Shell [to execute a command in the terminal]
     Write to File [to write to a file path]
+    Execute Shell [to execute a command in the terminal]
     """
 
     def perform_write_file(self,file_path,content):
