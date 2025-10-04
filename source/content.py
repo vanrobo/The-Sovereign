@@ -17,7 +17,7 @@ Here are the available functions and their required arguments:
 - **write_file**: Writes content to a specified file.
   - "args": { "file_path": "/path/to/the/file", "content": "the content to write" }
 
-- **read_file**: Reads the content of a specified file.
+- **read_file**: Reads the content of a specified file so you can use it in your thought process.
   - "args": { "file_path": "/path/to/the/file" }
 
 CRITICAL: A step can be made conditional by adding an optional "condition" object.

@@ -52,10 +52,10 @@ class Ai:
         return self # Return the object to be used inside the 'with' block
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        print("Closing AI Client resources...")
+        print("\nClosing AI Client resources...")
 
         self.client = None
-        print("Client resources released.")
+        print("Client resources released.\n")
 
     def generate(self, content=None, modelgem="gemini-2.5-flash"):
         if content is None:
@@ -85,7 +85,22 @@ class Ai:
         except Exception as e:
             print(f"  [FAILURE] Could not write to file '{file_path}': {e}")
             return False # Indicate failure      
-        
+    
+    def perform_read_file(self, file_path):
+        """Reads a file and prints its content."""
+        try:
+            with open(file_path, 'r') as f:
+                content = f.read()
+            print(f"  [SUCCESS] Read file: '{file_path}'")
+            print(f"  [CONTENT]:\n---\n{content}\n---")
+            return True # Indicate success
+        except FileNotFoundError:
+            print(f"  [FAILURE] File not found: '{file_path}'")
+            return False # Indicate failure
+        except Exception as e:
+            print(f"  [FAILURE] Could not read file '{file_path}': {e}")
+            return False # Indicate failure
+
     def perform_execute_shell(self,command):
         """Executes a shell command."""
         try:
@@ -104,6 +119,8 @@ class Ai:
             print(f"  [FAILURE] Command '{command}' failed with exit code {e.returncode}")
             print(f"  [STDERR]: {e.stderr}")
             return False # Indicate failure
+        
+        
         
 """
 This is just temporary, command line only, user input based output testing for a basic baron AI agent.
@@ -209,6 +226,13 @@ if __name__ == "__main__":
                             file_content = commandargs.get('content')
                             if file_path and file_content:
                                 execution_success = orchestrator.perform_write_file(file_path,file_content)
+                        
+                        elif commandfunc == "read_file":
+                            commandargs = command_call.get('args')
+                            file_path = commandargs.get('file_path')
+                            if file_path:
+                                execution_success = orchestrator.perform_read_file(file_path)
+
                         else:
                             continue
 
