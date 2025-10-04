@@ -47,7 +47,7 @@ class Ai:
     """
 
     def __enter__(self):
-        print("Initializing AI Client...")
+        print("\nInitializing AI Client...")
         self.client = genai.Client(api_key=self.api_key)
         return self # Return the object to be used inside the 'with' block
 
