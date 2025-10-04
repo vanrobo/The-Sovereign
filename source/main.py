@@ -121,18 +121,18 @@ if __name__ == "__main__":
                 out=orchestrator.generate(x) # generates the output and returns a json
                 AIjson=json.loads(out) # loading the json
 
+                with open("temp.json",'w') as f:
+                    f.write(out)
 
                 for step in AIjson['steps']:
-                    # --- Safely get all the data from the current step ---
+                    # Safely get all the data from the current step 
                     step_num = step.get('step_number', 'N/A')
                     command_call = step.get('command_call', {})
                     function_call = command_call.get('function', 'N/A')
                     arguments = command_call.get('args', {})
 
-                    # --- Print the primary step information ---
                     print(f"Step {step_num}:")
 
-                    # Determine what the command is for display purposes
                     display_command = "N/A"
                     if function_call == 'execute_shell':
                         display_command = arguments.get('command', 'No command specified.')
@@ -141,7 +141,7 @@ if __name__ == "__main__":
 
                     print(f"  └── Command: `{display_command}`")
 
-                    # --- Check for and print the conditional logic ---
+                    # Check for and print the conditional logic 
                     if 'condition' in step:
                         condition = step['condition']
                         check_step = condition.get('check_step', '?')
@@ -169,6 +169,49 @@ if __name__ == "__main__":
                 if not has_shell_commands:
                     print("(No raw shell commands in this plan)")
                 print("-------------------------------------\n")
+
+                option=input("execute? Y/n").lower().strip()
+                if option != "n" or option != "no":
+                    step_outcomes={}
+                    print("Executing: ")
+                    for step in AIjson['steps']:
+                        condition = step.get('condition',{})
+                        step_num = step.get('step_number', 'N/A')
+                        
+                        if condition:
+                            check_step_num = condition.get('check_step')
+                            on_outcome = condition.get('on_outcome')
+                            previous_outcome = step_outcomes.get(check_step_num)
+                            
+                            if previous_outcome != on_outcome:
+                                print(f"Skip {step_num} due to unmet conditions ")
+                                continue
+
+                        command_call = step.get('command_call')
+                        commandfunc = command_call.get('function')
+                        execution_success = False
+
+                        if commandfunc == "execute_shell":
+                            commandargs = command_call.get('args')
+                            command = commandargs.get('command',"")
+                            if command:
+                                execution_success = orchestrator.perform_execute_shell(command)
+
+                        elif commandfunc == "write_file":
+                            commandargs = command_call.get('args')
+                            file_path = commandargs.get('file_path')
+                            file_content = commandargs.get('content')
+                            if file_path and file_content:
+                                execution_success = orchestrator.perform_write_file(file_path,file_content)
+                        else:
+                            continue
+
+                        
+                        if execution_success:
+                            step_outcomes[step_num] = "success"
+                        else:
+                            step_outcomes[step_num] = "failure"
+                        
 
         except json.JSONDecodeError:
             print("\n--- ERROR: The AI did not return valid JSON. ---")
