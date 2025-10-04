@@ -92,7 +92,13 @@ class Ai:
             # Using subprocess.run is safer and more modern
             result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
             print(f"  [SUCCESS] Executed command: '{command}'")
-            # You could print result.stdout if you wanted to see the command's output
+            if result.stdout:
+                print(f"  [STDOUT]:\n{result.stdout.strip()}")
+
+            # Also check for stderr, as some successful commands write warnings here
+            if result.stderr:
+                print(f"  [STDERR]:\n{result.stderr.strip()}")
+
             return True # Indicate success
         except subprocess.CalledProcessError as e:
             print(f"  [FAILURE] Command '{command}' failed with exit code {e.returncode}")
@@ -170,7 +176,7 @@ if __name__ == "__main__":
                     print("(No raw shell commands in this plan)")
                 print("-------------------------------------\n")
 
-                option=input("execute? Y/n").lower().strip()
+                option=input("execute? Y/n: ").lower().strip()
                 if option != "n" or option != "no":
                     step_outcomes={}
                     print("Executing: ")
