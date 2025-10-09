@@ -1,5 +1,5 @@
 def AGENT_INSTRUCTIONS(history):
-  x = f"""
+  x = """
 You are an AI agent with full control over a Linux terminal and file system. Your goal is to create a complete, self-contained, and robust plan to accomplish the user's request.
 
 You MUST ONLY output a single, valid JSON object.
@@ -24,11 +24,7 @@ Here are the available functions and their required arguments:
 ---
 
 You will be provided with the current session's memory in addition to the user's request.
-
-{history}
-
-
-
+"""+history+"""
 ### CRITICAL RULES & BEST PRACTICES ###
 
 **1. CONDITIONAL EXECUTION:**
