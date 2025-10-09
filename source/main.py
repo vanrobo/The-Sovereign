@@ -62,13 +62,21 @@ class Ai:
         self.client = None
         print("Client resources released.\n")
 
-    def generate(self, content=None, modelgem="gemini-2.5-flash"):
-        if content is None:
-            content="The User Has Entered No Content"
-        response = self.client.models.generate_content(
-            model=modelgem,
-            contents=self.instructions_content+content,
-            config={
+# Corrected generate method
+    def generate(self, user_content=None, modelgem="gemini-1.5-flash"):
+        if user_content is None:
+            user_content = "The User Has Entered No Content"
+
+        # Get the latest context string right when it's needed
+        context_string = self._prepare_context_string()
+
+        # Safely combine all parts of the prompt
+        full_prompt = self.instructions_content + context_string + user_content
+
+        model = genai.GenerativeModel(modelgem)
+        response = model.generate_content(
+            contents=full_prompt,
+            generation_config={
                 "response_mime_type": "application/json",
             }
         )
@@ -322,7 +330,7 @@ if __name__ == "__main__":
     while True:
         try:
             x=input("what would you like to do?: ")
-            with Ai(content.AGENT_INSTRUCTIONS(Ai._prepare_context_string),"Baron") as orchestrator: #just the prompt from content file and the ai class
+            with Ai(permission="Baron") as orchestrator: #just the prompt from content file and the ai class
                 print("Initialised\n\n") 
                 out=orchestrator.generate(x) # generates the output and returns a json
                 AIjson=json.loads(out) # loading the json
