@@ -9,18 +9,17 @@ import subprocess
 #from this project
 import content
 
-"""
-This is the AI Class
-The Ai class automatically initialises the gemini AI, and gives it a function to generate outputs
-IT CONTAINS A PERMANENT INSTRUCTIONS CONTENT THAT THE AI WILL ALWAYS FOLLOW
-
-Generate()
-Allows the AI to generate outputs, returns the value, confined to using json using response_mime_Type, 
-also has option for modelgem [which allows you to specify the model]
-"""
 
 class Ai:
+    """
+    This is the AI Class
+    The Ai class automatically initialises the gemini AI, and gives it a function to generate outputs
+    IT CONTAINS A PERMANENT INSTRUCTIONS CONTENT THAT THE AI WILL ALWAYS FOLLOW
 
+    Generate()
+    Allows the AI to generate outputs, returns the value, confined to using json using response_mime_Type, 
+    also has option for modelgem [which allows you to specify the model]
+    """
     PERMISSION_LEVELS = {
             'Baron': 1,      
             'Viscount': 2,   
@@ -45,7 +44,12 @@ class Ai:
         
         self.permission = permission #  the main permission system, Baron -> Viscount -> Earl -> Marquess -> Duke
         self.conversation_history = []
-        self.step_outcomes = {}
+        
+        try:
+            with open("data.txt", "r") as file:
+                self.past_history = file.read()
+        except FileNotFoundError:
+            print("  [WARNING] No past history found, continuing.\n")
 
     """
     Enter and Exit are used as the entire code should be in a with statement. 
@@ -55,23 +59,27 @@ class Ai:
         print("\nInitializing AI Client...")
         self.client = genai.Client(api_key=self.api_key)
 
+
         return self # Return the object to be used inside the 'with' block
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         print("\nClosing AI Client resources...")
+        print("Saving Data...")
+
+        context_string = self._prepare_context_string()
+
+        with open("data.txt", "a") as file:
+            file.write(context_string)
 
         self.client = None
         print("Client resources released.\n")
 
-# Corrected generate method
-    def generate(self, user_content=None, modelgem="gemini-1.5-flash"):
+    def generate(self, user_content=None):
         if user_content is None:
             user_content = "The User Has Entered No Content"
 
-        # Get the latest context string right when it's needed
-        context_string = self._prepare_context_string()
+        context_string = self.past_history+self._prepare_context_string()
 
-        # Safely combine all parts of the prompt
         full_prompt = self.instructions_content + context_string + user_content
 
         response = self.client.models.generate_content(
@@ -107,11 +115,10 @@ class Ai:
             
         return str("\n".join(context_parts) + "\n")
 
-
-
     """
     Tools: 
     Write to File [to write to a file path]
+    Read File [To read the file out]
     Execute Shell [to execute a command in the terminal]
     """
 
@@ -159,14 +166,11 @@ class Ai:
             print(f"  [FAILURE] Command '{command}' failed with exit code {e.returncode}")
             print(f"  [STDERR]: {e.stderr}")
             return False # Indicate failure
-    
-
 
     def parse_output(self,AIjson):
 
         '''Parse output, for readability'''
         
-
         try:
             for step in AIjson['steps']:
                 # Safely get all the data from the current step 
@@ -235,15 +239,14 @@ class Ai:
     def execute_commands(self, ai_json, permission=True):
             """Executes all the steps in the parsed AI JSON object."""
             try:
-                # 1. Check for permission if required
+                # Check for permission if required
                 if permission:
                     option = input("Execute the plan? [Y/n] ").lower().strip()
                     if option in ("n", "no"):
                         print("Execution cancelled by user.")
                         return False  # Exit the function if user denies
 
-                # 2. If permission is granted (or not required), proceed with execution
-                # This logic is now outside the if/else, so it runs after permission is confirmed.
+                # If permission is granted (or not required), proceed with execution
                 self.step_outcomes = {}  # Clear outcomes from previous runs
                 print("\nExecuting Plan...")
 
@@ -256,7 +259,7 @@ class Ai:
                         print("  [WARNING] Skipping a step because it has no 'step_number'.")
                         continue
 
-                    # 3. Check if the step is conditional
+                    # Check if the step is conditional
                     should_execute = True  # Assume the step should run unless a condition fails
                     if condition:
                         check_step_num = condition.get('check_step')
@@ -270,7 +273,7 @@ class Ai:
                     if not should_execute:
                         continue # Move to the next step in the loop
 
-                    # 4. Get command details and execute
+                    # Get command details and execute
                     print(f"  [RUNNING] Step {step_num}...")
                     command_call = step.get('command_call', {})
                     command_func_name = command_call.get('function')
@@ -303,22 +306,20 @@ class Ai:
                         print(f"  [FAILURE] Unknown function '{command_func_name}' in step {step_num}.")
                         continue # Skip to the next step
 
-                    # 5. Record the outcome for conditional logic
+                    # Record the outcome for conditional logic
                     if execution_success:
                         self.step_outcomes[step_num] = "success"
-                        print(f"    └── Outcome: SUCCESS")
                     else:
                         self.step_outcomes[step_num] = "failure"
-                        print(f"    └── Outcome: FAILURE")
 
                 print("\nExecution Finished.")
                 return True
 
             except KeyError as e:
-                print(f"\n--- ERROR: The AI's JSON was missing a required key during execution: {e} ---")
+                print(f"\n  --- [ERROR]: The AI's JSON was missing a required key during execution: {e} ---")
                 return False
             except Exception as e:
-                print(f"\nAn unexpected error occurred during execution: {e}")
+                print(f"\n  [ERROR]: An unexpected error occurred during execution: {e}")
                 return False
 
     def parse_and_execute(self,input_json,permission=True):
@@ -336,29 +337,27 @@ It outputs the following:-
 2. All the steps, wtih reasoning and the command
 3. All the steps  with command and conditions and function calls
 4. All the steps without any extra formatting, to copy paste into a terminal to test. 
-    └──[this does not have the conditional and functional calling, beware]
+
 """
 
+EXIT_PHRASES = ['exit', 'quit', 'bye', 'end', 'stop', 'close', 'exit program', 'quit program', 'i want to exit', 'i want to quit', 'goodbye', 'end program']
 
-# At the bottom of the file, change the __main__ block:
 
 if __name__ == "__main__":
-    # FIXED: Create the Ai instance ONCE, outside the loop.
-    # This preserves its state and conversation history.
+    '''
+    run a one time only, chat with the Ai.  
+    '''
     with Ai(permission="Baron") as orchestrator:
         print("AI Initialised and Ready.")
-        # FIXED: The loop now happens inside the 'with' block.
         while True:
             try:
-                x = input("\nwhat would you like to do?: ")
-                if x.lower() in ['exit', 'quit']:
+                choice = input("\nwhat would you like to do?: ")
+                if choice in ['quit','exit','leave','bye','q','qexit'] :
                     break
                 
-                # The rest of your logic works perfectly inside here
-                orchestrator.add_to_history('user', x)
-                out = orchestrator.generate(x)
+                orchestrator.add_to_history('user', choice)
+                out = orchestrator.generate(choice)
                 
-                # It's good practice to save the raw output
                 with open("temp.json", 'w') as f:
                     f.write(out)
                     
@@ -370,3 +369,4 @@ if __name__ == "__main__":
                 print("\n--- ERROR: The AI did not return valid JSON. ---")
             except Exception as e:
                 print(f"An error occurred in the main loop: {e}")
+
