@@ -37,7 +37,7 @@ class Ai:
         if not self.api_key:
             raise ValueError("API_KEY environment variable not found")
         
-        self.instructions_content=instructions_content
+        self.instructions_content=instructions_content()
         self.client = None
     
         if permission not in self.PERMISSION_LEVELS:
@@ -54,6 +54,7 @@ class Ai:
     def __enter__(self):
         print("\nInitializing AI Client...")
         self.client = genai.Client(api_key=self.api_key)
+
         return self # Return the object to be used inside the 'with' block
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -73,10 +74,10 @@ class Ai:
         # Safely combine all parts of the prompt
         full_prompt = self.instructions_content + context_string + user_content
 
-        model = genai.GenerativeModel(modelgem)
-        response = model.generate_content(
+        response = self.client.models.generate_content(
+            model="gemini-2.5-flash",
             contents=full_prompt,
-            generation_config={
+            config={
                 "response_mime_type": "application/json",
             }
         )
@@ -161,11 +162,10 @@ class Ai:
     
 
 
-    def parse_output(self,input_json):
+    def parse_output(self,AIjson):
 
         '''Parse output, for readability'''
         
-        AIjson = json.loads(input_json)
 
         try:
             for step in AIjson['steps']:
@@ -232,80 +232,94 @@ class Ai:
         self.step_outcomes = {}
         print("Agent Memory Cleared")
 
-    def execute_commands(self,input_json,permission=True):
-        '''execute all the steps in the json'''
+    def execute_commands(self, ai_json, permission=True):
+            """Executes all the steps in the parsed AI JSON object."""
+            try:
+                # 1. Check for permission if required
+                if permission:
+                    option = input("Execute the plan? [Y/n] ").lower().strip()
+                    if option in ("n", "no"):
+                        print("Execution cancelled by user.")
+                        return False  # Exit the function if user denies
 
-        try:
-            if permission:
-                option=input("execute the plan [Y/n] ").lower().strip()
-                if option == "n" or option == "no":
-                    return False
-            else:
-                self.step_outcomes={}
-                print("Executing: ")
-                for step in AIjson.get('steps',[]):
+                # 2. If permission is granted (or not required), proceed with execution
+                # This logic is now outside the if/else, so it runs after permission is confirmed.
+                self.step_outcomes = {}  # Clear outcomes from previous runs
+                print("\nExecuting Plan...")
 
-                    condition = step.get('condition',{})
-                    step_num = step.get('step_number', 'N/A')
-                    
+                # Directly use the ai_json dictionary passed into the function
+                for step in ai_json.get('steps', []):
+                    step_num = step.get('step_number')
+                    condition = step.get('condition', {})
+
                     if step_num is None:
-                        print("Skipping step with no step_number.")
+                        print("  [WARNING] Skipping a step because it has no 'step_number'.")
                         continue
 
-                    # check condition
-
+                    # 3. Check if the step is conditional
+                    should_execute = True  # Assume the step should run unless a condition fails
                     if condition:
                         check_step_num = condition.get('check_step')
-                        on_outcome = condition.get('on_outcome')
+                        required_outcome = condition.get('on_outcome')
                         previous_outcome = self.step_outcomes.get(check_step_num)
 
-                        if previous_outcome != on_outcome:
-                            print(f"Skip {step_num} due to unmet conditions ")
-                            continue
-                    
-                    # get command function and arguments
+                        # Check if the required outcome was met in the previous step
+                        if previous_outcome != required_outcome:
+                            print(f"  [SKIPPED] Step {step_num} because condition was not met (Required: '{required_outcome}'",f"Actual for Step {check_step_num}: '{previous_outcome}').")
+                            should_execute = False # Do not execute this step
+                    if not should_execute:
+                        continue # Move to the next step in the loop
 
-                    command_call = step.get('command_call')
-                    commandfunc = command_call.get('function')
-                    commandargs = command_call.get('args',{})
+                    # 4. Get command details and execute
+                    print(f"  [RUNNING] Step {step_num}...")
+                    command_call = step.get('command_call', {})
+                    command_func_name = command_call.get('function')
+                    command_args = command_call.get('args', {})
                     execution_success = False
 
-                    if commandfunc == "execute_shell":
-                        command = commandargs.get('command',"")
+                    if command_func_name == "execute_shell":
+                        command = command_args.get('command')
                         if command:
-                            execution_success = orchestrator.perform_execute_shell(command)
+                            # Use 'self' to call methods within the same class
+                            execution_success = self.perform_execute_shell(command)
 
-                    elif commandfunc == "write_file":
-                        file_path = commandargs.get('file_path')
-                        file_content = commandargs.get('content')
-                        if file_path and file_content:
-                            execution_success = orchestrator.perform_write_file(file_path,file_content)
+                    elif command_func_name == "write_file":
+                        file_path = command_args.get('file_path')
+                        file_content = command_args.get('content')
+                        if file_path and file_content is not None:
+                            execution_success = self.perform_write_file(file_path, file_content)
+                        else:
+                            print(f"  [FAILURE] Step {step_num} is missing 'file_path' or 'content'.")
 
-                    elif commandfunc == "read_file":
-                        file_path = commandargs.get('file_path')
+
+                    elif command_func_name == "read_file":
+                        file_path = command_args.get('file_path')
                         if file_path:
-                            execution_success = orchestrator.perform_read_file(file_path)
+                            execution_success = self.perform_read_file(file_path)
+                        else:
+                            print(f"  [FAILURE] Step {step_num} is missing 'file_path'.")
+
                     else:
-                        continue
-                    
+                        print(f"  [FAILURE] Unknown function '{command_func_name}' in step {step_num}.")
+                        continue # Skip to the next step
+
+                    # 5. Record the outcome for conditional logic
                     if execution_success:
                         self.step_outcomes[step_num] = "success"
-                        print(f"  └── Step {step_num} outcome: success")
+                        print(f"    └── Outcome: SUCCESS")
                     else:
                         self.step_outcomes[step_num] = "failure"
-                        print(f"  └── Step {step_num} outcome: failure")
+                        print(f"    └── Outcome: FAILURE")
 
+                print("\nExecution Finished.")
                 return True
-            
-        except json.JSONDecodeError:
-            print("\n--- ERROR: The AI did not return valid JSON. ---")
-            return False
-        except KeyError as e:
-            print(f"\n--- ERROR: The AI's JSON was missing a required key: {e} ---")
-            return False
-        except Exception as e:
-            print(f"\nAn unexpected error occurred during execution: {e}")
-            return False
+
+            except KeyError as e:
+                print(f"\n--- ERROR: The AI's JSON was missing a required key during execution: {e} ---")
+                return False
+            except Exception as e:
+                print(f"\nAn unexpected error occurred during execution: {e}")
+                return False
 
     def parse_and_execute(self,input_json,permission=True):
         '''
@@ -326,20 +340,33 @@ It outputs the following:-
 """
 
 
+# At the bottom of the file, change the __main__ block:
+
 if __name__ == "__main__":
-    while True:
-        try:
-            x=input("what would you like to do?: ")
-            with Ai(permission="Baron") as orchestrator: #just the prompt from content file and the ai class
-                print("Initialised\n\n") 
-                out=orchestrator.generate(x) # generates the output and returns a json
-                AIjson=json.loads(out) # loading the json
-
-                with open("temp.json",'w') as f:
+    # FIXED: Create the Ai instance ONCE, outside the loop.
+    # This preserves its state and conversation history.
+    with Ai(permission="Baron") as orchestrator:
+        print("AI Initialised and Ready.")
+        # FIXED: The loop now happens inside the 'with' block.
+        while True:
+            try:
+                x = input("\nwhat would you like to do?: ")
+                if x.lower() in ['exit', 'quit']:
+                    break
+                
+                # The rest of your logic works perfectly inside here
+                orchestrator.add_to_history('user', x)
+                out = orchestrator.generate(x)
+                
+                # It's good practice to save the raw output
+                with open("temp.json", 'w') as f:
                     f.write(out)
-
+                    
+                AIjson = json.loads(out)
+                orchestrator.add_to_history('agent', out)
                 orchestrator.parse_and_execute(AIjson)
 
-        except Exception as e:
-            print(e)
-
+            except json.JSONDecodeError:
+                print("\n--- ERROR: The AI did not return valid JSON. ---")
+            except Exception as e:
+                print(f"An error occurred in the main loop: {e}")

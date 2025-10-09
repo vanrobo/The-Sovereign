@@ -1,4 +1,4 @@
-def AGENT_INSTRUCTIONS(history):
+def AGENT_INSTRUCTIONS(history=None):
   x = """
 You are an AI agent with full control over a Linux terminal and file system. Your goal is to create a complete, self-contained, and robust plan to accomplish the user's request.
 
@@ -24,7 +24,7 @@ Here are the available functions and their required arguments:
 ---
 
 You will be provided with the current session's memory in addition to the user's request.
-"""+history+"""
+"""+str(history)+"""
 ### CRITICAL RULES & BEST PRACTICES ###
 
 **1. CONDITIONAL EXECUTION:**
