@@ -29,7 +29,9 @@ class Ai:
             'Duke': 5         
         }
     
-    def __init__(self,instructions_content,permission):
+    load_dotenv()
+
+    def __init__(self,permission='Baron',instructions_content=content.AGENT_INSTRUCTIONS,):
         self.api_key = os.getenv("API_KEY")
         
         if not self.api_key:
@@ -40,7 +42,10 @@ class Ai:
     
         if permission not in self.PERMISSION_LEVELS:
             raise ValueError(f"Invalid Permission level: {permission}")
+        
         self.permission = permission #  the main permission system, Baron -> Viscount -> Earl -> Marquess -> Duke
+        self.conversation_history = []
+        self.step_outcomes = {}
 
     """
     Enter and Exit are used as the entire code should be in a with statement. 
@@ -68,6 +73,32 @@ class Ai:
             }
         )
         return response.text
+    
+    def _prepare_context_string(self):
+        """Formats history and outcomes into a string for the AI prompt."""
+        if not self.conversation_history and not self.step_outcomes:
+            return "" # Return empty string if there's no history
+
+        context_parts = []
+        
+        # Format conversation history
+        if self.conversation_history:
+            context_parts.append("## Conversation History")
+            for entry in self.conversation_history:
+                role = "User" if entry['role'] == 'user' else "Agent"
+                context_parts.append(f"{role}: {entry['content']}")
+            context_parts.append("---")
+
+        # Format step outcomes from the last execution
+        if self.step_outcomes:
+            context_parts.append("## Previous Execution Outcomes")
+            for step_num, outcome in self.step_outcomes.items():
+                context_parts.append(f"Step {step_num}: {outcome.upper()}")
+            context_parts.append("---")
+            
+        return "\n".join(context_parts) + "\n"
+
+
 
     """
     Tools: 
@@ -119,9 +150,162 @@ class Ai:
             print(f"  [FAILURE] Command '{command}' failed with exit code {e.returncode}")
             print(f"  [STDERR]: {e.stderr}")
             return False # Indicate failure
+    
+
+
+    def parse_output(self,input_json):
+
+        '''Parse output, for readability'''
         
-        
-        
+        AIjson = json.loads(input_json)
+
+        try:
+            for step in AIjson['steps']:
+                # Safely get all the data from the current step 
+                step_num = step.get('step_number', 'N/A')
+                command_call = step.get('command_call', {})
+                function_call = command_call.get('function', 'N/A')
+                arguments = command_call.get('args', {})
+                print(f"Step {step_num}:")
+                display_command = "N/A"
+                if function_call == 'execute_shell':
+                    display_command = arguments.get('command', 'No command specified.')
+                elif function_call == 'write_file':
+                    display_command = f"Write to file '{arguments.get('file_path', 'N/A')}'"
+
+                print(f"  └── Command: `{display_command}`")
+
+                # Check for and print the conditional logic 
+                if 'condition' in step:
+                    condition = step['condition']
+                    check_step = condition.get('check_step', '?')
+                    required_outcome = condition.get('on_outcome', '?')
+                    print(f"      └── Condition: Depends on step {check_step} outcome being '{required_outcome}'")
+                    print(f"          └── Full Command Call Details:")
+                    print(f"              └── Function: {function_call}")
+                    print(f"              └── Arguments: {arguments}")
+                else:
+                    print("      └── Condition: None (This step always runs)")
+
+            print("--------------------------\n")
+            print()
+            has_shell_commands = False
+            for step in AIjson['steps']:
+                # Check if the function is 'execute_shell' before trying to print a command
+                if step.get('command_call', {}).get('function') == 'execute_shell':
+                    command = step['command_call'].get('args', {}).get('command')
+                    if command:
+                        print(command)
+                        has_shell_commands = True
+
+            if not has_shell_commands:
+                print("(No raw shell commands in this plan)")
+            print("-------------------------------------\n")
+
+        except json.JSONDecodeError:
+            print("\n--- ERROR: The AI did not return valid JSON. ---")
+        except KeyError as e:
+            print(f"\n--- ERROR: The AI's JSON was missing a required key: {e} ---")
+        except Exception as e:
+            print(f"\nAn unexpected error occurred: {e}")
+
+
+    def add_to_history(self,role,content):
+        '''Helper method to add entries to the history'''
+        self.conversation_history.append({"role": role, "content": content})
+    
+    def get_full_history(self):
+        '''Returns full conversational history'''
+        return self.conversation_history
+    
+    def clear_memory(self):
+        '''Clears conversation history and Step Outcomes'''
+        self.conversation_history = []
+        self.step_outcomes = {}
+        print("Agent Memory Cleared")
+
+    def execute_commands(self,input_json,permission=True):
+        '''execute all the steps in the json'''
+
+        try:
+            if permission:
+                option=input("execute the plan [Y/n] ").lower().strip()
+                if option == "n" or option == "no":
+                    return False
+            else:
+                self.step_outcomes={}
+                print("Executing: ")
+                for step in AIjson.get('steps',[]):
+
+                    condition = step.get('condition',{})
+                    step_num = step.get('step_number', 'N/A')
+                    
+                    if step_num is None:
+                        print("Skipping step with no step_number.")
+                        continue
+
+                    # check condition
+
+                    if condition:
+                        check_step_num = condition.get('check_step')
+                        on_outcome = condition.get('on_outcome')
+                        previous_outcome = self.step_outcomes.get(check_step_num)
+
+                        if previous_outcome != on_outcome:
+                            print(f"Skip {step_num} due to unmet conditions ")
+                            continue
+                    
+                    # get command function and arguments
+
+                    command_call = step.get('command_call')
+                    commandfunc = command_call.get('function')
+                    commandargs = command_call.get('args',{})
+                    execution_success = False
+
+                    if commandfunc == "execute_shell":
+                        command = commandargs.get('command',"")
+                        if command:
+                            execution_success = orchestrator.perform_execute_shell(command)
+
+                    elif commandfunc == "write_file":
+                        file_path = commandargs.get('file_path')
+                        file_content = commandargs.get('content')
+                        if file_path and file_content:
+                            execution_success = orchestrator.perform_write_file(file_path,file_content)
+
+                    elif commandfunc == "read_file":
+                        file_path = commandargs.get('file_path')
+                        if file_path:
+                            execution_success = orchestrator.perform_read_file(file_path)
+                    else:
+                        continue
+                    
+                    if execution_success:
+                        self.step_outcomes[step_num] = "success"
+                        print(f"  └── Step {step_num} outcome: success")
+                    else:
+                        self.step_outcomes[step_num] = "failure"
+                        print(f"  └── Step {step_num} outcome: failure")
+
+                return True
+            
+        except json.JSONDecodeError:
+            print("\n--- ERROR: The AI did not return valid JSON. ---")
+            return False
+        except KeyError as e:
+            print(f"\n--- ERROR: The AI's JSON was missing a required key: {e} ---")
+            return False
+        except Exception as e:
+            print(f"\nAn unexpected error occurred during execution: {e}")
+            return False
+
+    def parse_and_execute(self,input_json,permission=True):
+        '''
+        Parse and then Execute, mostly for debugging
+        '''
+        self.parse_output(input_json)
+        self.execute_commands(input_json,permission=permission)
+
 """
 This is just temporary, command line only, user input based output testing for a basic baron AI agent.
 It outputs the following:-
@@ -135,11 +319,10 @@ It outputs the following:-
 
 
 if __name__ == "__main__":
-    load_dotenv()
     while True:
         try:
             x=input("what would you like to do?: ")
-            with Ai(content.AGENT_INSTRUCTIONS,"Baron") as orchestrator: #just the prompt from content file and the ai class
+            with Ai(content.AGENT_INSTRUCTIONS(Ai._prepare_context_string),"Baron") as orchestrator: #just the prompt from content file and the ai class
                 print("Initialised\n\n") 
                 out=orchestrator.generate(x) # generates the output and returns a json
                 AIjson=json.loads(out) # loading the json
@@ -147,105 +330,8 @@ if __name__ == "__main__":
                 with open("temp.json",'w') as f:
                     f.write(out)
 
-                for step in AIjson['steps']:
-                    # Safely get all the data from the current step 
-                    step_num = step.get('step_number', 'N/A')
-                    command_call = step.get('command_call', {})
-                    function_call = command_call.get('function', 'N/A')
-                    arguments = command_call.get('args', {})
+                orchestrator.parse_and_execute(AIjson)
 
-                    print(f"Step {step_num}:")
-
-                    display_command = "N/A"
-                    if function_call == 'execute_shell':
-                        display_command = arguments.get('command', 'No command specified.')
-                    elif function_call == 'write_file':
-                        display_command = f"Write to file '{arguments.get('file_path', 'N/A')}'"
-
-                    print(f"  └── Command: `{display_command}`")
-
-                    # Check for and print the conditional logic 
-                    if 'condition' in step:
-                        condition = step['condition']
-                        check_step = condition.get('check_step', '?')
-                        required_outcome = condition.get('on_outcome', '?')
-
-                        print(f"      └── Condition: Depends on step {check_step} outcome being '{required_outcome}'")
-                        print(f"          └── Full Command Call Details:")
-                        print(f"              └── Function: {function_call}")
-                        print(f"              └── Arguments: {arguments}")
-                    else:
-                        print("      └── Condition: None (This step always runs)")
-
-                print("--------------------------\n")
-
-                print()
-                has_shell_commands = False
-                for step in AIjson['steps']:
-                    # Check if the function is 'execute_shell' before trying to print a command
-                    if step.get('command_call', {}).get('function') == 'execute_shell':
-                        command = step['command_call'].get('args', {}).get('command')
-                        if command:
-                            print(command)
-                            has_shell_commands = True
-
-                if not has_shell_commands:
-                    print("(No raw shell commands in this plan)")
-                print("-------------------------------------\n")
-
-                option=input("execute? Y/n: ").lower().strip()
-                if option != "n" or option != "no":
-                    step_outcomes={}
-                    print("Executing: ")
-                    for step in AIjson['steps']:
-                        condition = step.get('condition',{})
-                        step_num = step.get('step_number', 'N/A')
-                        
-                        if condition:
-                            check_step_num = condition.get('check_step')
-                            on_outcome = condition.get('on_outcome')
-                            previous_outcome = step_outcomes.get(check_step_num)
-                            
-                            if previous_outcome != on_outcome:
-                                print(f"Skip {step_num} due to unmet conditions ")
-                                continue
-
-                        command_call = step.get('command_call')
-                        commandfunc = command_call.get('function')
-                        execution_success = False
-
-                        if commandfunc == "execute_shell":
-                            commandargs = command_call.get('args')
-                            command = commandargs.get('command',"")
-                            if command:
-                                execution_success = orchestrator.perform_execute_shell(command)
-
-                        elif commandfunc == "write_file":
-                            commandargs = command_call.get('args')
-                            file_path = commandargs.get('file_path')
-                            file_content = commandargs.get('content')
-                            if file_path and file_content:
-                                execution_success = orchestrator.perform_write_file(file_path,file_content)
-                        
-                        elif commandfunc == "read_file":
-                            commandargs = command_call.get('args')
-                            file_path = commandargs.get('file_path')
-                            if file_path:
-                                execution_success = orchestrator.perform_read_file(file_path)
-
-                        else:
-                            continue
-
-                        
-                        if execution_success:
-                            step_outcomes[step_num] = "success"
-                        else:
-                            step_outcomes[step_num] = "failure"
-                        
-
-        except json.JSONDecodeError:
-            print("\n--- ERROR: The AI did not return valid JSON. ---")
-        except KeyError as e:
-            print(f"\n--- ERROR: The AI's JSON was missing a required key: {e} ---")
         except Exception as e:
-            print(f"\nAn unexpected error occurred: {e}")
+            print(e)
+
