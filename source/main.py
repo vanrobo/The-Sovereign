@@ -104,7 +104,7 @@ class Ai:
                 context_parts.append(f"Step {step_num}: {outcome.upper()}")
             context_parts.append("---")
             
-        return "\n".join(context_parts) + "\n"
+        return str("\n".join(context_parts) + "\n")
 
 
 
