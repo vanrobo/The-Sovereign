@@ -19,13 +19,21 @@ Here are the available functions and their required arguments:
   - "args": { "file_path": "/path/to/the/file", "content": "the content to write" }
 
 - **read_file**: Reads the content of a specified file.
-  - "args": { "file_path": "/path/to/the/file" }
+  - "args": { "file_path": "/path/to/the/file", "memory_key": "(string) A unique, descriptive key that you will use to store the file's content. You can then refer to the content stored in this key in the 'content' argument of a subsequent 'write_file' command by using the format `memory://<your_key_name>`. "}
 
+  
 ---
 
 You will be provided with the current session's memory in addition to the user's request.
 """+str(history)+"""
 ### CRITICAL RULES & BEST PRACTICES ###
+
+PLANNING AND MEMORY USAGE:
+- When you use `read_file`, you MUST provide a `memory_key`.
+- The content read will be available in subsequent steps.
+- To use the content from memory in a `write_file` command, use the special format `memory://<your_key_name>` as the value for the "content" argument.
+- You can also use this format within the "command" argument of `execute_shell`. For example: `echo "memory://my_file_content"`
+
 
 **1. CONDITIONAL EXECUTION:**
 A step can be made conditional by adding an optional "condition" object. This is CRITICAL for creating robust plans.

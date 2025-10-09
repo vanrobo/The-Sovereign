@@ -45,6 +45,7 @@ class Ai:
         self.permission = permission #  the main permission system, Baron -> Viscount -> Earl -> Marquess -> Duke
         self.step_outcomes = {}
         self.conversation_history = []
+        self.session_memory = {}
 
         try:
             with open("history.json", "r") as f:
@@ -114,7 +115,14 @@ class Ai:
             return "" # Return empty string if there's no history
 
         context_parts = []
-        
+        # Format Session Memory
+        if self.session_memory:
+            context_parts.append("## In-Session Memory (from read_file)")
+            for key, value in self.session_memory.items():
+                context_parts.append(f"### Memory Key: '{key}'")
+                context_parts.append(f"Content:\n---\n{value}\n---")
+            context_parts.append("---")
+
         # Format conversation history
         if self.conversation_history:
             context_parts.append("## Conversation History")
@@ -150,17 +158,21 @@ class Ai:
             print(f"  [FAILURE] Could not write to file '{file_path}': {e}")
             return False # Indicate failure      
     
-    def perform_read_file(self, file_path):
+    def perform_read_file(self, file_path, memory_key):
         """Reads a file and prints its content."""
         try:
             with open(file_path, 'r') as f:
                 content = f.read()
             print(f"  [SUCCESS] Read file: '{file_path}'")
-            print(f"  [CONTENT]:\n---\n{content}\n---")
+            print(f"  [CONTENT STORED] Storing content with key: '{memory_key}'")
+            self.session_memory[memory_key] = content
+
             return True # Indicate success
+        
         except FileNotFoundError:
             print(f"  [FAILURE] File not found: '{file_path}'")
             return False # Indicate failure
+        
         except Exception as e:
             print(f"  [FAILURE] Could not read file '{file_path}': {e}")
             return False # Indicate failure
@@ -240,7 +252,7 @@ class Ai:
 
 
     def add_to_history(self,role,content):
-        '''Helper method to add entries to the history'''
+        '''Helper method to add entries to the history'''                                             
         self.conversation_history.append({"role": role, "content": content})
     
     def get_full_history(self):
@@ -251,8 +263,25 @@ class Ai:
         '''Clears conversation history and Step Outcomes'''
         self.conversation_history = []
         self.step_outcomes = {}
+        self.session_memory = {}
         print("Agent Memory Cleared")
 
+    def _resolve_memory_references(self, args_dict):
+            """
+            Recursively searches through a dictionary of arguments and replaces 
+            'memory://<key>' placeholders with content from self.session_memory.
+            """
+            resolved_args = {}
+            for key, value in args_dict.items():
+                if isinstance(value, str) and value.startswith("memory://"):
+                    memory_key = value[9:] # Get the key name after "memory://"
+                    # Replace the placeholder with actual content, default to an empty string if not found
+                    resolved_args[key] = self.session_memory.get(memory_key, "")
+                    print(f"    [MEMORY] Resolved '{value}' with content from session memory.")
+                else:
+                    resolved_args[key] = value
+            return resolved_args
+    
     def execute_commands(self, ai_json, permission=True):
             """Executes all the steps in the parsed AI JSON object."""
             try:
@@ -294,7 +323,7 @@ class Ai:
                     print(f"  [RUNNING] Step {step_num}...")
                     command_call = step.get('command_call', {})
                     command_func_name = command_call.get('function')
-                    command_args = command_call.get('args', {})
+                    command_args = self._resolve_memory_references(command_call.get('args', {}))
                     execution_success = False
 
                     if command_func_name == "execute_shell":
@@ -314,8 +343,9 @@ class Ai:
 
                     elif command_func_name == "read_file":
                         file_path = command_args.get('file_path')
-                        if file_path:
-                            execution_success = self.perform_read_file(file_path)
+                        memory_key = command_args.get('memory_key')
+                        if file_path and memory_key:
+                            execution_success = self.perform_read_file(file_path,memory_key)
                         else:
                             print(f"  [FAILURE] Step {step_num} is missing 'file_path'.")
 
