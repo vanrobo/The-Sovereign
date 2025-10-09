@@ -43,13 +43,17 @@ class Ai:
             raise ValueError(f"Invalid Permission level: {permission}")
         
         self.permission = permission #  the main permission system, Baron -> Viscount -> Earl -> Marquess -> Duke
+        self.step_outcomes = {}
         self.conversation_history = []
-        
+
         try:
-            with open("data.txt", "r") as file:
-                self.past_history = file.read()
-        except FileNotFoundError:
-            print("  [WARNING] No past history found, continuing.\n")
+            with open("history.json", "r") as f:
+                data = json.load(f)
+                self.conversation_history = data.get("conversation_history", [])
+                self.step_outcomes = data.get("last_execution_outcomes", {})
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.conversation_history = []
+            self.step_outcomes = {}
 
     """
     Enter and Exit are used as the entire code should be in a with statement. 
@@ -68,17 +72,30 @@ class Ai:
 
         context_string = self._prepare_context_string()
 
-        with open("data.txt", "a") as file:
-            file.write(context_string)
+        history_to_save = {
+            "conversation_history": self.conversation_history,
+            "last_execution_outcomes": self.step_outcomes
+        }
+        with open("history.json", "w") as f: # Use 'w' to overwrite
+            json.dump(history_to_save, f, indent=2)
 
         self.client = None
         print("Client resources released.\n")
+
+    @staticmethod
+    def past_history():
+        try:
+            with open("data.txt", "r") as file:
+                history = file.read()
+                return history
+        except FileNotFoundError:
+            print("  [WARNING] No past history found, continuing.\n")
 
     def generate(self, user_content=None):
         if user_content is None:
             user_content = "The User Has Entered No Content"
 
-        context_string = self.past_history+self._prepare_context_string()
+        context_string = self._prepare_context_string()
 
         full_prompt = self.instructions_content + context_string + user_content
 
@@ -340,7 +357,7 @@ It outputs the following:-
 
 """
 
-EXIT_PHRASES = ['exit', 'quit', 'bye', 'end', 'stop', 'close', 'exit program', 'quit program', 'i want to exit', 'i want to quit', 'goodbye', 'end program']
+EXIT_PHRASES = ['exit', 'quit', 'bye', 'end', 'stop', 'close','die','kys','exit program', 'quit program', 'i want to exit', 'i want to quit', 'goodbye', 'end program']
 
 
 if __name__ == "__main__":
@@ -369,4 +386,5 @@ if __name__ == "__main__":
                 print("\n--- ERROR: The AI did not return valid JSON. ---")
             except Exception as e:
                 print(f"An error occurred in the main loop: {e}")
-
+            except KeyboardInterrupt:
+                break
