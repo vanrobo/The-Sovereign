@@ -82,6 +82,8 @@ class Ai:
 
         self.client = None
         print("Client resources released.\n")
+        print("Log")
+        
 
     @staticmethod
     def past_history():
@@ -320,7 +322,7 @@ class Ai:
                         continue # Move to the next step in the loop
 
                     # Get command details and execute
-                    print(f"  [RUNNING] Step {step_num}...")
+                    print(f"  [RUNNING] Step {step_num}...")    
                     command_call = step.get('command_call', {})
                     command_func_name = command_call.get('function')
                     command_args = self._resolve_memory_references(command_call.get('args', {}))
@@ -411,6 +413,7 @@ if __name__ == "__main__":
                 AIjson = json.loads(out)
                 orchestrator.add_to_history('agent', out)
                 orchestrator.parse_and_execute(AIjson)
+                
 
             except json.JSONDecodeError:
                 print("\n--- ERROR: The AI did not return valid JSON. ---")
