@@ -310,7 +310,7 @@ class Ai:
                     print(f"  [RUNNING] Step {step_num}...")    
                     command_call = step.get('command_call', {})
                     command_func_name = command_call.get('function')
-                    command_args = self._resolve_memory_references(command_call.get('args', {}))
+                    command_args = command_call.get('args', {})
                     execution_success = False
 
                     if command_func_name == "execute_shell":
