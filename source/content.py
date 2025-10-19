@@ -19,7 +19,7 @@ Here are the available functions and their required arguments:
   - "args": { "file_path": "/path/to/the/file", "content": "the content to write" }
 
 - **read_file**: Reads the content of a specified file.
-  - "args": { "file_path": "/path/to/the/file", "memory_key": "(string) A unique, descriptive key that you will use to store the file's content. You can then refer to the content stored in this key in the 'content' argument of a subsequent 'write_file' command by using the format `memory://<your_key_name>`. "}
+  - "args": { "file_path": "/path/to/the/file", "memory_key": "use the memory key to attach a certain value to it, like if you read a python file, you may give the memory_key as python_file_game_project."}
 
   
 ---
