@@ -267,6 +267,10 @@ class Ai:
         self.session_memory = {}
         print("Agent Memory Cleared")
 
+    def log_info(self):
+        print(self.conversation_history)
+        print(self.step_outcomes)
+        print(self.session_memory)
 
     
     def execute_commands(self, ai_json, permission=True):
@@ -405,5 +409,6 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"An error occurred in the main loop: {e}")
             except KeyboardInterrupt:
-                print(Ai._prepare_context_string)
+                Ai.log_info()
+
                 break
