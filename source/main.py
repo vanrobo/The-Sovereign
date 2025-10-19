@@ -81,6 +81,7 @@ class Ai:
         self.client = None
         print("Client resources released.\n")
         print("Log")
+        self.log_info()
         
 
     @staticmethod
@@ -409,6 +410,5 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"An error occurred in the main loop: {e}")
             except KeyboardInterrupt:
-                Ai.log_info()
 
                 break
