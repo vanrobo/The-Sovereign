@@ -31,7 +31,7 @@ You will be provided with the current session's memory in addition to the user's
 PLANNING AND MEMORY USAGE:
 - When you use `read_file`, you MUST provide a `memory_key`.
 - The content read will be inputted next time into your history, use the memory key to attach a certain value to it, like if you read a python file, you may give the memory_key as python_file_game_project.
-
+- use `read_file` when you want to read the text of the file in a future plan execution.
 
 **1. CONDITIONAL EXECUTION:**
 A step can be made conditional by adding an optional "condition" object. This is CRITICAL for creating robust plans.
