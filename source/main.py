@@ -269,9 +269,11 @@ class Ai:
         print("Agent Memory Cleared")
 
     def log_info(self):
-        with open(r'log.txt','w') as file:
+        with open(r'log.txt','a') as file:
+            file.write('LOG')
             file.write(self.conversation_history)
             file.write(self.step_outcomes)
+            file.write('SESSION MEMORY')
             file.write(self.session_memory)
 
     
