@@ -71,8 +71,6 @@ class Ai:
         print("\nClosing AI Client resources...")
         print("Saving Data...")
 
-        context_string = self._prepare_context_string()
-
         history_to_save = {
             "conversation_history": self.conversation_history,
             "last_execution_outcomes": self.step_outcomes
@@ -193,6 +191,7 @@ class Ai:
                 print(f"  [STDERR]:\n{result.stderr.strip()}")
 
             return True # Indicate success
+        
         except subprocess.CalledProcessError as e:
             print(f"  [FAILURE] Command '{command}' failed with exit code {e.returncode}")
             print(f"  [STDERR]: {e.stderr}")
@@ -268,21 +267,7 @@ class Ai:
         self.session_memory = {}
         print("Agent Memory Cleared")
 
-    def _resolve_memory_references(self, args_dict):
-            """
-            Recursively searches through a dictionary of arguments and replaces 
-            'memory://<key>' placeholders with content from self.session_memory.
-            """
-            resolved_args = {}
-            for key, value in args_dict.items():
-                if isinstance(value, str) and value.startswith("memory://"):
-                    memory_key = value[9:] # Get the key name after "memory://"
-                    # Replace the placeholder with actual content, default to an empty string if not found
-                    resolved_args[key] = self.session_memory.get(memory_key, "")
-                    print(f"    [MEMORY] Resolved '{value}' with content from session memory.")
-                else:
-                    resolved_args[key] = value
-            return resolved_args
+
     
     def execute_commands(self, ai_json, permission=True):
             """Executes all the steps in the parsed AI JSON object."""
@@ -401,7 +386,7 @@ if __name__ == "__main__":
         while True:
             try:
                 choice = input("\nwhat would you like to do?: ")
-                if choice in ['quit','exit','leave','bye','q','qexit'] :
+                if choice in ['quit','exit','leave','bye','q','qexit','die'] :
                     break
                 
                 orchestrator.add_to_history('user', choice)
@@ -420,4 +405,5 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"An error occurred in the main loop: {e}")
             except KeyboardInterrupt:
+                print(Ai._prepare_context_string)
                 break

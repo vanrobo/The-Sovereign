@@ -30,9 +30,7 @@ You will be provided with the current session's memory in addition to the user's
 
 PLANNING AND MEMORY USAGE:
 - When you use `read_file`, you MUST provide a `memory_key`.
-- The content read will be available in subsequent steps.
-- To use the content from memory in a `write_file` command, use the special format `memory://<your_key_name>` as the value for the "content" argument.
-- You can also use this format within the "command" argument of `execute_shell`. For example: `echo "memory://my_file_content"`
+- The content read will be inputted next time into your history, use the memory key to attach a certain value to it, like if you read a python file, you may give the memory_key as python_file_game_project.
 
 
 **1. CONDITIONAL EXECUTION:**
@@ -58,6 +56,7 @@ To install software reliably, you MUST follow this three-step pattern:
 
 ---
 ### EXAMPLE of the "Check-Act-Verify" pattern to install 'jq' ###
+### Note, make sure if the app is ALREADY installed, then it still executes running it.
 {
   "thought": "I need to install 'jq'. I will use the robust 'Check-Act-Verify' pattern. First, I'll check if 'jq' is already installed. If it is not, I will install it using 'sudo apt-get'. If the installation succeeds, I will verify it by checking the version.",
   "steps": [
