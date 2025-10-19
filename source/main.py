@@ -386,7 +386,7 @@ if __name__ == "__main__":
         while True:
             try:
                 choice = input("\nwhat would you like to do?: ")
-                if choice in ['quit','exit','leave','bye','q','qexit','die'] :
+                if choice in EXIT_PHRASES:
                     break
                 
                 orchestrator.add_to_history('user', choice)
