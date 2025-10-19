@@ -42,7 +42,7 @@ class Ai:
         if permission not in self.PERMISSION_LEVELS:
             raise ValueError(f"Invalid Permission level: {permission}")
         
-        self.permission = permission #  the main permission system, Baron -> Viscount -> Earl -> Marquess -> Duke
+        self.permission = permission #  the main permission system, Baron -> Viscount -> Earl -> Marquess -> Duke NOT IMPLEMENTED THO
         self.step_outcomes = {}
         self.conversation_history = []
         self.session_memory = {}
