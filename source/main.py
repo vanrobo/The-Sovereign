@@ -271,10 +271,10 @@ class Ai:
     def log_info(self):
         with open(r'log.txt','a') as file:
             file.write('LOG')
-            file.write(self.conversation_history)
-            file.write(self.step_outcomes)
+            file.write(str(self.conversation_history))
+            file.write(str(self.step_outcomes))
             file.write('SESSION MEMORY')
-            file.write(self.session_memory)
+            file.write(str(self.session_memory))
 
     
     def execute_commands(self, ai_json, permission=True):
