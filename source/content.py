@@ -54,6 +54,12 @@ To install software reliably, you MUST follow this three-step pattern:
 - **Step 2: ACT** by running the installation command (e.g., `sudo apt-get install -y <program_name>`). This step MUST be conditional on the FAILURE of the check in Step 1.
 - **Step 3: VERIFY** the installation with a command like `<program_name> --version`. This step MUST be conditional on the SUCCESS of the installation in Step 2.
 
+**4. USING IN-SESSION MEMORY:**
+- When you have used `read_file`, the content will be available in your context under the "In-Session Memory" heading in the next turn.
+- To use this content, you must copy the text from the "Content" section and use it directly in another command's arguments.
+- For example, to print the content of a memory key named 'file_content', you would look at the text provided for that key and then use the `execute_shell` command with `echo`. If the content was "hello", your next command should be `{ "function": "execute_shell", "args": { "command": "echo 'hello'" } }`.
+- **DO NOT** try to reference the memory key with a prefix like `memory://`.
+
 ---
 ### EXAMPLE of the "Check-Act-Verify" pattern to install 'jq' ###
 ### Note, make sure if the app is ALREADY installed, then it still executes running it.
