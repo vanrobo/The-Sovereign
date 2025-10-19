@@ -269,9 +269,10 @@ class Ai:
         print("Agent Memory Cleared")
 
     def log_info(self):
-        print(self.conversation_history)
-        print(self.step_outcomes)
-        print(self.session_memory)
+        with open(r'log.txt','w') as file:
+            file.write(self.conversation_history)
+            file.write(self.step_outcomes)
+            file.write(self.session_memory)
 
     
     def execute_commands(self, ai_json, permission=True):
